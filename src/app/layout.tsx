@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Calistoga } from "next/font/google";
 import "./globals.css";
 import { twMerge } from "tailwind-merge";
+import NavBar from "@/components/Mine/Navbar";
 
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans"});
@@ -25,9 +26,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-      className={twMerge(inter.variable, calistoga.variable,"antialiased font-sans")}
+      className={twMerge(inter.variable, calistoga.variable,"antialiased font-sans bg-[#0e2a2e]")}
       >
+        <div className="min-h-screen">
+        <NavBar/>
         {children}
+        </div>
       </body>
     </html>
   );
