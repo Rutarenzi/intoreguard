@@ -1,4 +1,6 @@
+"use client"
 import NavBar from "@/components/Mine/Navbar";
+import ReportForm from "@/components/Mine/Report/ReportForm";
 import Image from "next/image";
 
 
@@ -10,6 +12,9 @@ export default function Home(
   }>
 
 ) {
+ const handleStepComplete =()=>{
+
+ }
   return (
     <div className="w-[80%] mx-auto">
      <div className="flex text-white">
@@ -27,7 +32,7 @@ export default function Home(
              <p>Report instantly, stay safe.</p>
            </div>
            <div className="mt-3 md:mt-20">
-            form
+              <ReportForm onComplete={handleStepComplete}/>
            </div>
        </div>
      </div>
