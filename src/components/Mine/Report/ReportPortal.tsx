@@ -1,0 +1,409 @@
+"use client"
+import { useState, useCallback } from "react";
+import crypto from "crypto";
+import { LocationInput } from "./LocationInput";
+ 
+const INCIDENT_CATEGORIES = Object.freeze([
+  "Theft",
+  "Fire Outbreak",
+  "Medical Emergency",
+  "Natural Disaster",
+  "Violence",
+  "Other",
+] as const);
+
+type IncidentLevel = "EMERGENCY" | "NON_EMERGENCY";
+
+  interface ReportPortal {
+    Completed: (data: any) => void;
+  }
+
+const ReportPortal=({ Completed }: ReportPortal)=>{
+
+  const [photo, updatePhoto] = useState<string | null>(null);
+  const [analyzing, setAnalyzingStatus] = useState(false);
+  const [submitting, setSubmittingStatus] = useState(false);
+  const [location, updateLocation] = useState({
+    lat: null as number | null,
+    lng: null as number | null,
+  });
+  const [formData, setFormData] =  useState({
+    incidentLevel: "" as IncidentLevel,
+    incidentCategory: "",
+    description: "",
+    location: "",
+    title: "",
+  });
+  
+  const ImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAnalyzingStatus(true);
+
+    try {
+      const base64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+
+      const response = await fetch("/api/photoDetect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64 }),
+      });
+
+      const data = await response.json();
+      console.log(data)
+
+      if (data.title && data.description && data.incidentCategory) {
+        setFormData((prev) => ({
+          ...prev,
+          title: data.title,
+          description: data.description,
+          incidentCategory: data.incidentCategory,
+        }));
+        updatePhoto(base64 as string);
+      }
+      updatePhoto(base64 as string);
+    } catch (error) {
+      console.error("Error detecting photo:", error);
+    } finally {
+      setAnalyzingStatus(false);
+    }
+  };
+
+  const createUniqueId = useCallback(() => {
+    const timeStamp = `${Date.now()}`;
+    const randomHex = crypto.randomBytes(16).toString("hex");
+    const rawId = `${timeStamp}-${randomHex}`;
+  
+    return crypto
+      .createHash("sha256")
+      .update(rawId)
+      .digest("hex")
+      .substring(0, 16);
+  }, []);
+  
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingStatus(true);
+
+    try {
+      const reportData = {
+        reportId: createUniqueId(),
+        type: formData.incidentLevel,
+        incidentCategory: formData.incidentCategory,
+        title: formData.title,
+        description: formData.description,
+        location: formData.location,
+        latitude: location.lat,
+        longitude: location.lng,
+        image: photo,
+        status: "PENDING",
+      };
+
+      console.log(reportData)
+
+      const response = await fetch("/api/report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(reportData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Report submission failed");
+      }
+
+      Completed(result);
+    } catch (error) {
+      console.error("Error submitting report:", error);
+    } finally {
+      setSubmittingStatus(false);
+    }
+  };
+
+
+    return(
+      <form onSubmit={handleSubmit} className="space-y-8">
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() =>
+            setFormData((prev) => ({ ...prev, incidentLevel: "EMERGENCY" }))
+          }
+          className={`p-2 rounded-xl border-2 transition-all duration-200 ${
+            formData.incidentLevel === "EMERGENCY"
+              ? "bg-red-500/20 border-red-500 shadow-lg shadow-red-500/20"
+              : "bg-zinc-900/50 border-zinc-800 hover:bg-red-500/10 hover:border-red-500/50"
+          }`}
+        >
+          <div className="flex flex-col items-center space-y-2">
+            <svg
+              className="w-4 h-4 text-red-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <span className="font-normal text-red-500">Emergency</span>
+            <span className="text-sm text-zinc-400">
+              Immediate Response Required
+            </span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            setFormData((prev) => ({ ...prev, incidentLevel: "NON_EMERGENCY" }))
+          }
+          className={`p-2 rounded-xl border-2 transition-all duration-200 ${
+            formData.incidentLevel === "NON_EMERGENCY"
+              ? "bg-orange-500/20 border-orange-500 shadow-lg shadow-orange-500/20"
+              : "bg-zinc-900/50 border-zinc-800 hover:bg-orange-500/10 hover:border-orange-500/50"
+          }`}
+        >
+          <div className="flex flex-col items-center space-y-2">
+            <svg
+              className="w-4 h-4 text-orange-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span className="font-medium text-orange-500">Non-Emergency</span>
+            <span className="text-xs text-zinc-400">General Report</span>
+          </div>
+        </button>
+      </div>
+
+      {/* Image Upload */}
+      <div className="relative group">
+        <input
+          type="file"
+          accept="image/*"
+          onChange={ImageUpload}
+          className="hidden"
+          id="image-upload"
+        />
+        <label
+          htmlFor="image-upload"
+          className="block w-full p-8 border-2 border-dashed border-zinc-700 rounded-2xl 
+                   hover:border-sky-500/50 hover:bg-sky-500/5 transition-all duration-200
+                   cursor-pointer text-center"
+        >
+          {photo ? (
+            <div className="space-y-4">
+              <div className="w-full h-48 relative rounded-lg overflow-hidden">
+                <img
+                  src={photo}
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <p className="text-sm text-zinc-400">Change image</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <svg
+                className="mx-auto h-12 w-12 text-zinc-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+              <p className="text-sm text-zinc-400">
+                Drop/Click to upload
+              </p>
+            </div>
+          )}
+        </label>
+        {analyzing && (
+          <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center">
+            <div className="flex items-center space-x-3">
+              <svg
+                className="animate-spin h-5 w-5 text-sky-500"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <span className="text-sky-500 font-medium">
+                Analyzing image...
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Specific Report Type */}
+      <div>
+        <label className="block text-sm font-medium text-zinc-400 mb-2">
+          Incident Type
+        </label>
+        <select
+          value={formData.incidentCategory}
+          onChange={(e) =>
+            setFormData((prev) => ({ ...prev, specificType: e.target.value }))
+          }
+          className="w-full rounded-xl bg-zinc-900/50 border border-zinc-800 px-4 py-3.5
+                   text-white transition-colors duration-200
+                   focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+          required
+        >
+          <option value="">Select type</option>
+          {INCIDENT_CATEGORIES.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Location */}
+      <LocationInput
+        value={formData.location}
+        onChange={(value) =>
+          setFormData((prev) => ({ ...prev, location: value }))
+        }
+        onCoordinatesChange={(lat, lng) =>
+          updateLocation({
+            lat: lat,
+            lng: lng,
+          })
+        }
+      />
+
+      {/* Title */}
+      <div>
+        <label className="block text-sm font-medium text-zinc-400 mb-2">
+          Report Title
+        </label>
+        <input
+          type="text"
+          value={formData.title}
+          onChange={(e) =>
+            setFormData((prev) => ({ ...prev, title: e.target.value }))
+          }
+          className="w-full rounded-xl bg-zinc-900/50 border border-zinc-800 px-4 py-3.5
+                   text-white transition-colors duration-200
+                   focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+          required
+        />
+      </div>
+
+      {/* Description */}
+      <div>
+        <label className="block text-sm font-medium text-zinc-400 mb-2">
+          Description
+        </label>
+        <textarea
+          value={formData.description}
+          onChange={(e) =>
+            setFormData((prev) => ({ ...prev, description: e.target.value }))
+          }
+          rows={4}
+          className="w-full rounded-xl bg-zinc-900/50 border border-zinc-800 px-4 py-3.5
+                   text-white transition-colors duration-200
+                   focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+          required
+        />
+      </div>
+
+      {/* Submit Button */}
+      <button
+        type="submit"
+        disabled={submitting}
+        className="w-full relative group overflow-hidden rounded-xl bg-white
+                 px-4 py-3.5 text-sm font-medium text-black shadow-lg
+                 transition-all duration-200 hover:white/10
+                 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <div className="relative flex items-center justify-center gap-2">
+          {submitting ? (
+            <>
+              <svg
+                className="animate-spin h-4 w-4"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <span>Submitting...</span>
+            </>
+          ) : (
+            <>
+              <span>Submit Report</span>
+              <svg
+                className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M14 5l7 7m0 0l-7 7m7-7H3"
+                />
+              </svg>
+            </>
+          )}
+        </div>
+      </button>
+    </form>
+    )
+}
+
+export default ReportPortal
