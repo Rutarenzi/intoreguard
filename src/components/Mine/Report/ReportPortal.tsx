@@ -2,43 +2,44 @@
 import { useState, useCallback } from "react";
 import crypto from "crypto";
 import { LocationInput } from "./LocationInput";
+ 
+const INCIDENT_CATEGORIES = Object.freeze([
+  "Theft",
+  "Fire Outbreak",
+  "Medical Emergency",
+  "Natural Disaster",
+  "Violence",
+  "Other",
+] as const);
 
-const REPORT_TYPES = [
-    "Theft",
-    "Fire Outbreak",
-    "Medical Emergency",
-    "Natural Disaster",
-    "Violence",
-    "Other",
-  ] as const;
-  type ReportType = "EMERGENCY" | "NON_EMERGENCY";
-  interface ReportFormProps {
-    onComplete: (data: any) => void;
+type IncidentLevel = "EMERGENCY" | "NON_EMERGENCY";
+
+  interface ReportPortal {
+    Completed: (data: any) => void;
   }
 
-const ReportForm=({ onComplete }: ReportFormProps)=>{
+const ReportPortal=({ Completed }: ReportPortal)=>{
+
+  const [photo, updatePhoto] = useState<string | null>(null);
+  const [analyzing, setAnalyzingStatus] = useState(false);
+  const [submitting, setSubmittingStatus] = useState(false);
+  const [location, updateLocation] = useState({
+    lat: null as number | null,
+    lng: null as number | null,
+  });
   const [formData, setFormData] =  useState({
-    incidentType: "" as ReportType,
-    specificType: "",
-    location: "",
+    incidentLevel: "" as IncidentLevel,
+    incidentCategory: "",
     description: "",
+    location: "",
     title: "",
   });
-  const [image, setImage] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [coordinates, setCoordinates] = useState<{
-    latitude: number | null;
-    longitude: number | null;
-  }>({
-    latitude: null,
-    longitude: null,
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  
+  const ImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsAnalyzing(true);
+    setAnalyzingStatus(true);
 
     try {
       const base64 = await new Promise((resolve) => {
@@ -47,60 +48,66 @@ const ReportForm=({ onComplete }: ReportFormProps)=>{
         reader.readAsDataURL(file);
       });
 
-      const response = await fetch("/api/analyze-image", {
+      const response = await fetch("/api/photoDetect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64 }),
       });
 
       const data = await response.json();
+      console.log(data)
 
-      if (data.title && data.description && data.reportType) {
+      if (data.title && data.description && data.incidentCategory) {
         setFormData((prev) => ({
           ...prev,
           title: data.title,
           description: data.description,
-          specificType: data.reportType,
+          incidentCategory: data.incidentCategory,
         }));
-        setImage(base64 as string);
+        updatePhoto(base64 as string);
       }
+      updatePhoto(base64 as string);
     } catch (error) {
-      console.error("Error analyzing image:", error);
+      console.error("Error detecting photo:", error);
     } finally {
-      setIsAnalyzing(false);
+      setAnalyzingStatus(false);
     }
   };
 
-  const generateReportId = useCallback(() => {
-    const timestamp = Date.now().toString();
-    const randomBytes = crypto.randomBytes(16).toString("hex");
-    const combinedString = `${timestamp}-${randomBytes}`;
+  const createUniqueId = useCallback(() => {
+    const timeStamp = `${Date.now()}`;
+    const randomHex = crypto.randomBytes(16).toString("hex");
+    const rawId = `${timeStamp}-${randomHex}`;
+  
     return crypto
       .createHash("sha256")
-      .update(combinedString)
+      .update(rawId)
       .digest("hex")
-      .slice(0, 16);
+      .substring(0, 16);
   }, []);
+  
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    setSubmittingStatus(true);
 
     try {
       const reportData = {
-        reportId: generateReportId(),
-        type: formData.incidentType,
-        specificType: formData.specificType,
+        reportId: createUniqueId(),
+        type: formData.incidentLevel,
+        incidentCategory: formData.incidentCategory,
         title: formData.title,
         description: formData.description,
         location: formData.location,
-        latitude: coordinates.latitude,
-        longitude: coordinates.longitude,
-        image: image,
+        latitude: location.lat,
+        longitude: location.lng,
+        image: photo,
         status: "PENDING",
       };
 
-      const response = await fetch("/api/reports/create", {
+      console.log(reportData)
+
+      const response = await fetch("/api/report", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -111,29 +118,28 @@ const ReportForm=({ onComplete }: ReportFormProps)=>{
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to submit report");
+        throw new Error(result.error || "Report submission failed");
       }
 
-      onComplete(result);
+      Completed(result);
     } catch (error) {
       console.error("Error submitting report:", error);
     } finally {
-      setIsSubmitting(false);
+      setSubmittingStatus(false);
     }
   };
 
 
     return(
       <form onSubmit={handleSubmit} className="space-y-8">
-      {/* Emergency Type Selection */}
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
           onClick={() =>
-            setFormData((prev) => ({ ...prev, incidentType: "EMERGENCY" }))
+            setFormData((prev) => ({ ...prev, incidentLevel: "EMERGENCY" }))
           }
           className={`p-2 rounded-xl border-2 transition-all duration-200 ${
-            formData.incidentType === "EMERGENCY"
+            formData.incidentLevel === "EMERGENCY"
               ? "bg-red-500/20 border-red-500 shadow-lg shadow-red-500/20"
               : "bg-zinc-900/50 border-zinc-800 hover:bg-red-500/10 hover:border-red-500/50"
           }`}
@@ -162,10 +168,10 @@ const ReportForm=({ onComplete }: ReportFormProps)=>{
         <button
           type="button"
           onClick={() =>
-            setFormData((prev) => ({ ...prev, incidentType: "NON_EMERGENCY" }))
+            setFormData((prev) => ({ ...prev, incidentLevel: "NON_EMERGENCY" }))
           }
           className={`p-2 rounded-xl border-2 transition-all duration-200 ${
-            formData.incidentType === "NON_EMERGENCY"
+            formData.incidentLevel === "NON_EMERGENCY"
               ? "bg-orange-500/20 border-orange-500 shadow-lg shadow-orange-500/20"
               : "bg-zinc-900/50 border-zinc-800 hover:bg-orange-500/10 hover:border-orange-500/50"
           }`}
@@ -195,7 +201,7 @@ const ReportForm=({ onComplete }: ReportFormProps)=>{
         <input
           type="file"
           accept="image/*"
-          onChange={handleImageUpload}
+          onChange={ImageUpload}
           className="hidden"
           id="image-upload"
         />
@@ -205,16 +211,16 @@ const ReportForm=({ onComplete }: ReportFormProps)=>{
                    hover:border-sky-500/50 hover:bg-sky-500/5 transition-all duration-200
                    cursor-pointer text-center"
         >
-          {image ? (
+          {photo ? (
             <div className="space-y-4">
               <div className="w-full h-48 relative rounded-lg overflow-hidden">
                 <img
-                  src={image}
+                  src={photo}
                   alt="Preview"
                   className="w-full h-full object-cover"
                 />
               </div>
-              <p className="text-sm text-zinc-400">Click to change image</p>
+              <p className="text-sm text-zinc-400">Change image</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -232,12 +238,12 @@ const ReportForm=({ onComplete }: ReportFormProps)=>{
                 />
               </svg>
               <p className="text-sm text-zinc-400">
-                Drop an image here or click to upload
+                Drop/Click to upload
               </p>
             </div>
           )}
         </label>
-        {isAnalyzing && (
+        {analyzing && (
           <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center">
             <div className="flex items-center space-x-3">
               <svg
@@ -274,7 +280,7 @@ const ReportForm=({ onComplete }: ReportFormProps)=>{
           Incident Type
         </label>
         <select
-          value={formData.specificType}
+          value={formData.incidentCategory}
           onChange={(e) =>
             setFormData((prev) => ({ ...prev, specificType: e.target.value }))
           }
@@ -284,9 +290,9 @@ const ReportForm=({ onComplete }: ReportFormProps)=>{
           required
         >
           <option value="">Select type</option>
-          {REPORT_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
+          {INCIDENT_CATEGORIES.map((category) => (
+            <option key={category} value={category}>
+              {category}
             </option>
           ))}
         </select>
@@ -299,9 +305,9 @@ const ReportForm=({ onComplete }: ReportFormProps)=>{
           setFormData((prev) => ({ ...prev, location: value }))
         }
         onCoordinatesChange={(lat, lng) =>
-          setCoordinates({
-            latitude: lat,
-            longitude: lng,
+          updateLocation({
+            lat: lat,
+            lng: lng,
           })
         }
       />
@@ -345,14 +351,14 @@ const ReportForm=({ onComplete }: ReportFormProps)=>{
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={isSubmitting}
-        className="w-full relative group overflow-hidden rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 
-                 px-4 py-3.5 text-sm font-medium text-white shadow-lg
-                 transition-all duration-200 hover:from-sky-400 hover:to-blue-500
+        disabled={submitting}
+        className="w-full relative group overflow-hidden rounded-xl bg-white
+                 px-4 py-3.5 text-sm font-medium text-black shadow-lg
+                 transition-all duration-200 hover:white/10
                  disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <div className="relative flex items-center justify-center gap-2">
-          {isSubmitting ? (
+          {submitting ? (
             <>
               <svg
                 className="animate-spin h-4 w-4"
@@ -400,4 +406,4 @@ const ReportForm=({ onComplete }: ReportFormProps)=>{
     )
 }
 
-export default ReportForm
+export default ReportPortal

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { AddressAutofill } from "@mapbox/search-js-react";
 
-interface LocationInputProps {
+interface LocationProps {
   value: string;
   onChange: (value: string) => void;
   onCoordinatesChange?: (lat: number | null, lng: number | null) => void;
@@ -12,7 +12,7 @@ export function LocationInput({
   value,
   onChange,
   onCoordinatesChange,
-}: LocationInputProps) {
+}: LocationProps) {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 

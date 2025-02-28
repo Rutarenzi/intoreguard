@@ -1,14 +1,13 @@
 "use client"
-import NavBar from "@/components/Mine/Navbar";
-import ReportForm from "@/components/Mine/Report/ReportForm";
-import Image from "next/image";
+import { ReportWizard } from "@/components/Mine/Report/ReportWizard";
+
 
 
 export default function Home(
   {
     children,
   }: Readonly<{
-    children: React.ReactNode;
+    children: React.ReactNode;  
   }>
 
 ) {
@@ -23,6 +22,11 @@ export default function Home(
          <div className="mt-20">
            <h6 className="text-[60px] lg:text-[120px] leading-none font-serif tracking-wide mt-4">INTORE GUARD</h6>
           <p className="text-xl">Report instantly, stay safe.</p>
+          <p className="mt-6 max-w-2xl text-sm leading-relaxed text-zinc-400">
+            "Make your community safer without compromising your safety. Our
+            advanced encryption ensures your identity remains completely
+            anonymous."
+          </p>
          </div>
        </div>
 
@@ -30,9 +34,10 @@ export default function Home(
            <div className="mt-10 md:hidden text-center font-serif">
              <h6>INTORE GUARD</h6>
              <p>Report instantly, stay safe.</p>
+          
            </div>
            <div className="mt-3 md:mt-20">
-              <ReportForm onComplete={handleStepComplete}/>
+              <ReportWizard/>
            </div>
        </div>
      </div>
