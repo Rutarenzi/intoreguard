@@ -1,16 +1,40 @@
 "use client"
+
+import Link, { useRouter } from "next/navigation";
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 
 const LoginForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const router = useRouter();
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log({ email, password });
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Invalid credentials");
+      } else {
+        router.push("/dashboard");
+      }
+    } catch (error) {
+      setError("An error occurred during sign in");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -36,7 +60,7 @@ const LoginForm = () => {
           </div>
           
           <div className="mb-6">
-            <label htmlFor="password" className="block text-white mb-2">
+            <label htmlFor="password" className="block text-white    mb-2">
               Password
             </label>
             <div className="relative">
@@ -64,12 +88,25 @@ const LoginForm = () => {
               </button>
             </div>
           </div>
+          <div className="flex justify-between text-white text-sm mb-4">
+            <p className="opacity-50">Your don't have account?</p>
+            <a href="/auth/signup">Create Account</a>
+          </div>
+          {error && (
+              <div className="text-red-500 mb-4 text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                {error}
+              </div>
+            )}
 
           <button
             type="submit"
             className="w-full p-3 bg-white text-black font-semibold rounded-full"
           >
-            Login
+             {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-greens border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  "Login"
+                )}
           </button>
         </form>
       </div>

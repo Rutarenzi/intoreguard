@@ -3,7 +3,7 @@ import { Inter, Calistoga } from "next/font/google";
 import "./globals.css";
 import { twMerge } from "tailwind-merge";
 import NavBar from "@/components/Mine/Navbar";
-
+import { Providers } from "./provider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans"});
 const calistoga = Calistoga({ 
@@ -29,8 +29,10 @@ export default function RootLayout({
       className={twMerge(inter.variable, calistoga.variable,"antialiased font-sans bg-[#0e2a2e]")}
       >
         <div className="min-h-screen">
+        
+        <Providers>
         <NavBar/>
-        {children}
+          {children}</Providers>
         </div>
       </body>
     </html>
